@@ -32,8 +32,8 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 COPY package*.json .
-COPY ./public ./public
 RUN npm ci --production
+COPY ./public ./public
 
 COPY --from=builder /app/.next ./.next
 
