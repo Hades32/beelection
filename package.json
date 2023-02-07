@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "(sleep 5 ; wget localhost:3000/ping )& next start",
+    "start": "(sleep 5 ; wget 127.0.0.1:3000/ping )& next start",
     "lint": "next lint",
     "deploy": "fly m run . -p 443:3000/tcp:tls:http -p 80:3000/tcp:http --region fra -a beelection",
     "kill": "fly machine destroy --force $(fly machine list --app beelection --json | jq -j '.[] | .id')"
