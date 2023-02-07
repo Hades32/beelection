@@ -6,7 +6,7 @@ export class BadStatusError extends Error {
 
 export async function stopMachine(id: string, app: string) {
   const resp = await fetch(
-    `http://${process.env.FLY_API_HOSTNAME}/v1/apps/user-functions/machines/${id}/stop`,
+    `http://${process.env.FLY_API_HOSTNAME}/v1/apps/${app}/machines/${id}/stop`,
     {
       headers: {
         Authorization: `Bearer ${process.env.FLY_API_TOKEN}`,
