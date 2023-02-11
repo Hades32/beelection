@@ -1,8 +1,9 @@
 fly.toml
 Dockerfile
 .dockerignore
-node_modules
-npm-debug.log
+frontend/node_modules
+frontend/npm-debug.log
 README.md
 .next
 .git
+backend/beelection-backend

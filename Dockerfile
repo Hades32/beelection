@@ -1,42 +1,28 @@
-# Install dependencies only when needed
-FROM node:16-alpine AS builder
-# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk add --no-cache libc6-compat
+FROM node:18-alpine AS node-build
+# RUN apk add --no-cache libc6-compat
 WORKDIR /app
-COPY . .
-RUN npm ci
+COPY ./frontend/package* ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
+COPY ./frontend/ ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm run build
 
-# If using npm with a `package-lock.json` comment out above and use below instead
-# RUN npm ci
-
-ENV NEXT_TELEMETRY_DISABLED 1
-
-# Add `ARG` instructions below if you need `NEXT_PUBLIC_` variables
-# then put the value on your fly.toml
-# Example:
-# ARG NEXT_PUBLIC_EXAMPLE="value here"
-
-RUN npm run build
-
-# If using npm comment out above and use below instead
-# RUN npm run build
-
-# Production image, copy all the files and run next
-FROM node:16-alpine AS runner
+FROM golang:1.20.0 as go-build
 WORKDIR /app
+COPY ./backend/go.* /app/
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=ssh \
+    go mod download
+COPY ./backend/ ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build $GO_ARGS -o /app/tangia
 
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
-ENV FLY_API_HOSTNAME="_api.internal:4280"
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-COPY package*.json .
-RUN npm ci --production
-COPY ./public ./public
-
-COPY --from=builder /app/.next ./.next
-
-USER nextjs
-CMD ["npm", "run", "start"]
+FROM gcr.io/distroless/base
+WORKDIR /app
+ENTRYPOINT ["/app/tangia"]
+ENV PORT=8080
+COPY --from=go-build /app/tangia /app/
+COPY --from=node-build /app/build /frontend/build
