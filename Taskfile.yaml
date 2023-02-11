@@ -21,7 +21,6 @@ tasks:
         if [ -z "${old_machines}" ]; then
           echo "no old machines"
         else
-          echo fly machine destroy --app beelection --force ${old_machines}
-          fly machine destroy --app beelection --force ${old_machines}
+          echo ${old_machines} | xargs -n1 fly machine destroy --app beelection --force 
         fi
       - fly m run . -p 443:8080/tcp:tls:http -p 80:8080/tcp:http --region fra -a beelection
