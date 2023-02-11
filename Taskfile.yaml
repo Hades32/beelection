@@ -1,0 +1,27 @@
+version: "3"
+
+env:
+  DOCKER_BUILDKIT: "1"
+
+tasks:
+  docker-run:
+    cmds:
+      - docker build -t tmp .
+      - docker run --rm -it -p 8080:8080 tmp .
+
+  build-run:
+    cmds:
+      - cd frontend && npm run build
+      - cd backend && go run .
+
+  deploy:
+    cmds:
+      - |
+        old_machines=$(fly machine list --app beelection --json | jq -r '.[] | .id')
+        if [ -z "${old_machines}" ]; then
+          echo "no old machines"
+        else
+          echo fly machine destroy --app beelection --force ${old_machines}
+          fly machine destroy --app beelection --force ${old_machines}
+        fi
+      - fly m run . -p 443:8080/tcp:tls:http -p 80:8080/tcp:http --region fra -a beelection
