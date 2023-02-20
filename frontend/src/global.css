@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+	font-family: 'Helvetica Neue', arial, sans-serif;
+	font-weight: 400;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+
+	@apply bg-yellow-50;
+}
+
+.pulsate {
+	animation: pulsate 1s ease-in-out 0s infinite normal none;
+}
+@keyframes pulsate {
+	0% {
+	  opacity: 1;
+	}
+	50% {
+	  opacity: 0.5;
+	}
+	100% {
+	  opacity: 1;
+	}
+	
+  }
