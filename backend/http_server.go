@@ -2,21 +2,27 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"golang.org/x/net/http2"
 )
 
+var wsUpgrader = websocket.Upgrader{}
+
 type HTTPServer struct {
-	server   *echo.Echo
-	IdleChan chan struct{}
+	server      *echo.Echo
+	IdleChan    chan struct{}
+	sessionsMgr *SessionManager
 }
 
 func StartHTTPServer(port string) (*HTTPServer, error) {
@@ -25,8 +31,9 @@ func StartHTTPServer(port string) (*HTTPServer, error) {
 		return nil, err
 	}
 	s := &HTTPServer{
-		server:   echo.New(),
-		IdleChan: make(chan struct{}, 1),
+		server:      echo.New(),
+		IdleChan:    make(chan struct{}, 1),
+		sessionsMgr: NewSessionManager(),
 	}
 	s.server.HideBanner = true
 	s.server.HidePort = true
@@ -50,6 +57,8 @@ func StartHTTPServer(port string) (*HTTPServer, error) {
 
 	s.server.Static("", "../frontend/build")
 	s.server.GET("/hc", s.HealthCheck)
+	s.server.POST("/api/session", s.NewSession)
+	s.server.Any("/api/session/:sessionID/ws", s.SessionWS)
 
 	s.server.Listener = listener
 	go func() {
@@ -92,6 +101,76 @@ func idleDetector(idleChan chan struct{}, idleTime time.Duration) func(next echo
 
 func (s *HTTPServer) HealthCheck(c echo.Context) error {
 	return c.String(http.StatusOK, "ok")
+}
+
+func (s *HTTPServer) NewSession(c echo.Context) error {
+	type (
+		resp struct {
+			Address string
+		}
+	)
+	// fake it for now
+	return c.JSON(http.StatusOK, resp{
+		Address: withoutPort(c.Request().Host) + ":" + EnvPort + "/api/session/" + EnvPort + "/ws",
+	})
+}
+
+func withoutPort(s string) string {
+	host, _, _ := strings.Cut(s, ":")
+	return host
+}
+
+func (s *HTTPServer) SessionWS(c echo.Context) error {
+	sessionID := c.Param("sessionID")
+	clientID := c.Request().Header.Get("Authorization")
+	ws, err := wsUpgrader.Upgrade(c.Response(), c.Request(), nil)
+	if err != nil {
+		return err
+	}
+	defer ws.Close()
+	ws.SetReadLimit(100_000)
+	session := s.sessionsMgr.Join(sessionID, clientID)
+	doneChan := make(chan struct{}, 2)
+
+	// read loop
+	go func() {
+		defer func() {
+			close(session.ClientMsgs)
+			doneChan <- struct{}{}
+		}()
+		for {
+			msgType, msg, err := ws.ReadMessage()
+			if err != nil {
+				logger.Error().Err(err).Int("msgType", msgType).Msg("failed to read message")
+				return
+			}
+			var cm ClientMessage
+			err = json.Unmarshal(msg, &cm)
+			if err != nil {
+				logger.Error().Err(err).Int("msgType", msgType).Msg("failed to read message")
+				return
+			}
+			cm.ClientID = clientID
+			session.ClientMsgs <- cm
+		}
+	}()
+	// write loop
+	go func() {
+		defer func() {
+			doneChan <- struct{}{}
+		}()
+		for msg := range session.ServerMsgs {
+			b, _ := json.Marshal(msg)
+			err := ws.WriteMessage(websocket.TextMessage, b)
+			if err != nil {
+				logger.Error().Err(err).Msg("failed to write message")
+				return
+			}
+		}
+	}()
+
+	<-doneChan
+	return nil
 }
 
 func (s *HTTPServer) Shutdown(ctx context.Context) error {

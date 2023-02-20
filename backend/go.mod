@@ -3,6 +3,7 @@ module beelection-backend
 go 1.20
 
 require (
+	github.com/gorilla/websocket v1.5.0
 	github.com/labstack/echo/v4 v4.10.0
 	github.com/rs/zerolog v1.29.0
 	github.com/samber/lo v1.37.0
