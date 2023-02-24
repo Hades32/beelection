@@ -18,6 +18,7 @@ const clientID = (() => {
 // Note: `id` comes from the URL, courtesy of our router
 const Swarm = ({ id }: Props) => {
   const stateMessage = useSignal("loading");
+  const numState = useSignal(42);
   const swarmAddr = atob(id);
   useEffect(() => {
     const ws = new WebSocket(
@@ -40,19 +41,39 @@ const Swarm = ({ id }: Props) => {
       stateMessage.value = "open";
       ws.send(
         JSON.stringify({
-          State: 42,
+          State: numState.value,
         })
       );
     };
     ws.onmessage = (e) => {
-      console.log("ws msg", e);
+      // console.log("ws msg", e);
       stateMessage.value = "msg-data: " + e.data;
     };
+    numState.subscribe((s) => {
+      console.log("new val", s);
+      try {
+        ws.send(
+          JSON.stringify({
+            State: s,
+          })
+        );
+      } catch (ex: any) {
+        console.error("failed to send", ex);
+      }
+    });
   }, []);
   return (
     <div>
       <h1>Swarm: {swarmAddr}</h1>
       <p>State: {stateMessage}</p>
+      <div>
+        <input
+          class="m-4 rounded border-gray-700 border-2 w-12"
+          type="number"
+          value={numState}
+          onChange={(e) => (numState.value = Number(e.currentTarget.value))}
+        />
+      </div>
     </div>
   );
 };
