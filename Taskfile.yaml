@@ -17,8 +17,9 @@ tasks:
     cmds:
       - |
         (cd frontend && npm run dev)&
+        frontendPID=$!
         cd backend && go run .
-
+        kill $frontendPID
   deploy:
     cmds:
       - |
