@@ -12,6 +12,8 @@ tasks:
   build-run:
     env:
       IDLE_TIMEOUT: 24h
+      PRETTY: 1
+      DEBUG: 1
     cmds:
       - |
         (cd frontend && npm run dev)&

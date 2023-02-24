@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/pprof"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -17,7 +19,19 @@ import (
 	"golang.org/x/net/http2"
 )
 
-var wsUpgrader = websocket.Upgrader{}
+var wsUpgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		portlessHost, _, _ := strings.Cut(r.Host, ":")
+		if portlessHost == "127.0.0.1" || portlessHost == "localhost" {
+			return true
+		}
+		oUrl, err := url.Parse(r.Header.Get("origin"))
+		if err != nil {
+			return false
+		}
+		return portlessHost == oUrl.Hostname()
+	},
+}
 
 type HTTPServer struct {
 	server      *echo.Echo
@@ -35,6 +49,7 @@ func StartHTTPServer(port string) (*HTTPServer, error) {
 		IdleChan:    make(chan struct{}, 1),
 		sessionsMgr: NewSessionManager(),
 	}
+	go s.sessionsMgr.Run()
 	s.server.HideBanner = true
 	s.server.HidePort = true
 	s.server.JSONSerializer = &NoEscapeJSONSerializer{}
@@ -59,6 +74,10 @@ func StartHTTPServer(port string) (*HTTPServer, error) {
 	s.server.GET("/hc", s.HealthCheck)
 	s.server.POST("/api/session", s.NewSession)
 	s.server.Any("/api/session/:sessionID/ws", s.SessionWS)
+
+	s.server.Any("/debug/pprof/:profile", func(c echo.Context) error {
+		return echo.WrapHandler(pprof.Handler(c.Param(("profile"))))(c)
+	})
 
 	s.server.Listener = listener
 	go func() {
@@ -122,7 +141,9 @@ func withoutPort(s string) string {
 
 func (s *HTTPServer) SessionWS(c echo.Context) error {
 	sessionID := c.Param("sessionID")
-	clientID := c.Request().Header.Get("Authorization")
+	clientID := c.QueryParam("clientID")
+	logger := logger.With().Str("clientID", clientID).Str("sessionID", sessionID).Logger()
+	logger.Info().Msg("starting ws session")
 	ws, err := wsUpgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
 		return err
@@ -132,6 +153,8 @@ func (s *HTTPServer) SessionWS(c echo.Context) error {
 	session := s.sessionsMgr.Join(sessionID, clientID)
 	doneChan := make(chan struct{}, 2)
 
+	// TODO rewrite to differentiate between clientID and connectionID
+
 	// read loop
 	go func() {
 		defer func() {
@@ -139,11 +162,13 @@ func (s *HTTPServer) SessionWS(c echo.Context) error {
 			doneChan <- struct{}{}
 		}()
 		for {
+			logger.Debug().Msg("waiting for client message")
 			msgType, msg, err := ws.ReadMessage()
 			if err != nil {
 				logger.Error().Err(err).Int("msgType", msgType).Msg("failed to read message")
 				return
 			}
+			logger.Debug().Msg("got ws message")
 			var cm ClientMessage
 			err = json.Unmarshal(msg, &cm)
 			if err != nil {
@@ -170,6 +195,7 @@ func (s *HTTPServer) SessionWS(c echo.Context) error {
 	}()
 
 	<-doneChan
+	logger.Info().Msg("closing ws session")
 	return nil
 }
 

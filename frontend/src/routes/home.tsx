@@ -22,7 +22,7 @@ const Home = () => {
       />
       <h1 class="text-2xl m-2">Let's beelect!</h1>
       <p class="m-2">
-        Click below to start a new swarm. Then share the URL with your friends
+        Click below to start a new swarm. Then share the URL with your friends!
       </p>
       <button
         onClick={startSwarm}
