@@ -5,11 +5,13 @@ env:
 
 tasks:
   docker-run:
+    desc: build and run docker container
     cmds:
       - docker build -t tmp .
       - docker run --rm -it -p 8080:8080 tmp .
 
   build-run:
+    desc: dev-run frontend and build and run backend locally
     env:
       IDLE_TIMEOUT: 24h
       PRETTY: 1
@@ -20,7 +22,9 @@ tasks:
         frontendPID=$!
         cd backend && go run .
         kill $frontendPID
+
   deploy:
+    desc: kill old deployments and push a new one
     cmds:
       - |
         old_machines=$(fly machine list --app beelection --json | jq -r '.[] | .id')

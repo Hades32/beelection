@@ -172,7 +172,7 @@ func (s *HTTPServer) SessionWS(c echo.Context) error {
 			var cm ClientMessage
 			err = json.Unmarshal(msg, &cm)
 			if err != nil {
-				logger.Error().Err(err).Int("msgType", msgType).Msg("failed to read message")
+				logger.Error().Err(err).Int("msgType", msgType).Msg("failed to unmarshal message")
 				return
 			}
 			cm.ClientID = clientID
