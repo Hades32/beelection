@@ -6,7 +6,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/rs/zerolog v1.29.0
-	github.com/samber/lo v1.37.0
+	github.com/samber/lo v1.38.1
 	golang.org/x/net v0.7.0
 )
 
