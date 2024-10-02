@@ -8,7 +8,7 @@ COPY ./frontend/ ./
 RUN --mount=type=cache,target=/root/.npm \
     npm run build
 
-FROM golang:1.20.1 as go-build
+FROM golang:1.23.2 as go-build
 WORKDIR /app
 COPY ./backend/go.* /app/
 RUN --mount=type=cache,target=/go/pkg/mod \
